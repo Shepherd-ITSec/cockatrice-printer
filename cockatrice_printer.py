@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Hellscube printable-sheet generator.
+Cockatrice printable-sheet generator.
 
 Input:
     One or more Cockatrice XML files downloaded from Hellfall.
@@ -26,14 +26,14 @@ Install:
     python -m pip install requests pillow reportlab
 
 Examples:
-    python hellscube.py list --xml-dir xml
-    python hellscube.py sets --xml-dir xml
-    python hellscube.py print --xml-dir xml --set SOH
-    python hellscube.py print --xml-dir xml --set SOH --cut-lines
-    python hellscube.py print --xml-dir xml --set SOH --duplex
-    python hellscube.py print --xml-dir xml --set SOH --duplex --back rotate180
-    python hellscube.py print --xml-dir xml --set SOH --names-file wanted.txt
-    python hellscube.py validate --xml-dir xml --set SOH
+    python cockatrice-printer.py list --xml-dir xml
+    python cockatrice-printer.py sets --xml-dir xml
+    python cockatrice-printer.py print --xml-dir xml --set SOH
+    python cockatrice-printer.py print --xml-dir xml --set SOH --cut-lines
+    python cockatrice-printer.py print --xml-dir xml --set SOH --duplex
+    python cockatrice-printer.py print --xml-dir xml --set SOH --duplex --back rotate180
+    python cockatrice-printer.py print --xml-dir xml --set SOH --names-file wanted.txt
+    python cockatrice-printer.py validate --xml-dir xml --set SOH
 """
 
 from __future__ import annotations
@@ -322,7 +322,7 @@ class ImageCache:
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": (
-                "HellscubePrintable/1.0 "
+                "CockatricePrintable/1.0 "
                 "(Python requests; card-sheet generator)"
             )
         })
@@ -390,7 +390,7 @@ def fit_crop_image(path: Path, out_path: Path, target_ratio: float):
     """
     Crop the image to the exact Magic-card aspect ratio.
 
-    Hellscube images should already be card-shaped. Cropping rather than
+    Images should already be card-shaped. Cropping rather than
     stretching protects the card proportions if an image has tiny borders.
     """
     with Image.open(path) as original:
@@ -608,7 +608,7 @@ def build_pdf(
     per_page = COLS * ROWS
 
     c = canvas.Canvas(str(output), pagesize=A4)
-    c.setTitle("Hellscube printable cards")
+    c.setTitle("Cockatrice printable cards")
 
     # Front sheets.
     for page_start in range(0, len(cards), per_page):
@@ -689,7 +689,7 @@ def make_default_back(path: Path):
         font = ImageFont.load_default()
 
     draw.rectangle((15, 15, width - 15, height - 15), outline="black", width=8)
-    text = "HELLSCUBE"
+    text = "cockatrice"
     bbox = draw.textbbox((0, 0), text, font=font)
     tw = bbox[2] - bbox[0]
     th = bbox[3] - bbox[1]
@@ -849,7 +849,7 @@ def cmd_print(args):
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    base = args.output or f"hellscube_{slug(info.code)}"
+    base = args.output or f"{slug(info.code)}"
 
     if not base.lower().endswith(".pdf"):
         base += ".pdf"
@@ -929,7 +929,7 @@ def cmd_print(args):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        description="Hellscube Cockatrice XML -> printable A4 sheets"
+        description="Cockatrice XML -> printable A4 sheets"
     )
 
     sub = parser.add_subparsers(dest="command", required=True)
@@ -982,7 +982,7 @@ def build_parser():
 
     p.add_argument(
         "--output",
-        help="PDF filename; default is hellscube_<set>.pdf",
+        help="PDF filename; default is <set>.pdf",
     )
 
     p.add_argument(

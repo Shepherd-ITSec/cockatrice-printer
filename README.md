@@ -2,7 +2,8 @@
 
 Generate printable **A4 card sheets** from **Cockatrice XML card databases**.
 
-This project is distributed as a ready-to-run Python application using **uv**.
+This project is distributed as a ready-to-run Python application. 
+We recomend using it via **uv**.
 
 ---
 
@@ -30,6 +31,11 @@ cockatrice-printer --help
 ```
 ```bash
 uv run cockatrice-printer --help
+```
+
+Or using the alias 
+```bash
+cockprint --help
 ```
 
 ---
