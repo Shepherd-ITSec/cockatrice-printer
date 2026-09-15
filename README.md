@@ -1,6 +1,6 @@
 # Cockatrice Printer
 
-Generate printable **A4 card sheets** from already-downloaded **Cockatrice XML card databases**.
+Generate printable **A4 card sheets** from **Cockatrice XML card databases**.
 
 This project is distributed as a ready-to-run Python application using **uv**.
 
@@ -11,37 +11,25 @@ This project is distributed as a ready-to-run Python application using **uv**.
 ## Via UV
 
 ```bash
-uv tool install git+https://github.com/yourusername/cockatrice-printer.git@main
+uv tool install git+https://github.com/shepherd-itsec/cockatrice-printer.git@master
+```
+
+## Via pip
+
+```bash
+pip install git+https://github.com/shepherd-itsec/cockatrice-printer.git@master
 ```
 
 ---
 
 # Running Cockatrice Printer
+Run it directly or through uv
 
-Because the project defines a command-line entry point, run it through uv:
-
+```bash
+cockatrice-printer --help
+```
 ```bash
 uv run cockatrice-printer --help
-```
-
-For example:
-
-```bash
-uv run cockatrice-printer list --xml-dir xml
-```
-
-or:
-
-```bash
-uv run cockatrice-printer print --xml-dir xml --set SOH
-```
-
-`uv run` automatically uses the project's environment.
-
-You can also use:
-
-```bash
-uv run cockatrice-printer validate --xml-dir xml --set SOH
 ```
 
 ---
@@ -49,17 +37,6 @@ uv run cockatrice-printer validate --xml-dir xml --set SOH
 # Input XML files
 
 Place your already-downloaded Cockatrice XML files in an `xml/` directory:
-
-```text
-cockatrice-printer/
-├── cockatrice_printer.py
-├── pyproject.toml
-├── uv.lock
-├── README.md
-└── xml/
-    ├── cards.xml
-    └── another-set.xml
-```
 
 The program expects Cockatrice card database XML.
 
@@ -386,163 +363,6 @@ The PDF contains the printable sheets.
 
 The CSV manifest contains information about the cards included in the print run, including their sheet/slot information and cached image paths.
 
----
-
-# Recommended first run
-
-After downloading the project:
-
-```bash
-cd cockatrice-printer
-```
-
-Install/synchronize the already-declared dependencies:
-
-```bash
-uv sync
-```
-
-Check that the application starts:
-
-```bash
-uv run cockatrice-printer --help
-```
-
-Put your XML files in:
-
-```text
-xml/
-```
-
-List the available sets:
-
-```bash
-uv run cockatrice-printer list --xml-dir xml
-```
-
-Validate the set you want:
-
-```bash
-uv run cockatrice-printer validate \
-    --xml-dir xml \
-    --set SOH
-```
-
-Then generate the PDF:
-
-```bash
-uv run cockatrice-printer print \
-    --xml-dir xml \
-    --set SOH
-```
-
----
-
-# Updating the environment
-
-If the project already contains a `uv.lock` file, use:
-
-```bash
-uv sync
-```
-
-This recreates/synchronizes the environment from the project configuration and lock file.
-
-To deliberately update dependency versions:
-
-```bash
-uv lock --upgrade
-uv sync
-```
-
-For normal use, **do not** use `--upgrade`; `uv sync` is enough.
-
----
-
-# Git / project files
-
-The important files are:
-
-```text
-pyproject.toml
-uv.lock
-cockatrice_printer.py
-README.md
-```
-
-Commit `pyproject.toml` and `uv.lock` to version control.
-
-Generated files such as cached images, PDFs, and the local virtual environment generally should not be committed.
-
-A suitable `.gitignore` is included:
-
-```gitignore
-.venv/
-__pycache__/
-*.py[cod]
-
-images/
-output/
-xml/
-```
-
----
-
-# Command summary
-
-List sets:
-
-```bash
-uv run cockatrice-printer list --xml-dir xml
-```
-
-Validate:
-
-```bash
-uv run cockatrice-printer validate --xml-dir xml --set SOH
-```
-
-Print:
-
-```bash
-uv run cockatrice-printer print --xml-dir xml --set SOH
-```
-
-Print with full cut lines:
-
-```bash
-uv run cockatrice-printer print --xml-dir xml --set SOH --cut-lines
-```
-
-Print duplex:
-
-```bash
-uv run cockatrice-printer print --xml-dir xml --set SOH --duplex
-```
-
-Filter by names:
-
-```bash
-uv run cockatrice-printer print \
-    --xml-dir xml \
-    --set SOH \
-    --names-file wanted.txt
-```
-
-Exclude tokens:
-
-```bash
-uv run cockatrice-printer print \
-    --xml-dir xml \
-    --set SOH \
-    --exclude-tokens
-```
-
-Show help:
-
-```bash
-uv run cockatrice-printer --help
-```
 
 ---
 
@@ -554,21 +374,6 @@ This means uv itself is not installed or is not available on your `PATH`.
 
 Install uv using its official installation instructions, then return to this project and run:
 
-```bash
-uv sync
-```
-
-This is the **only installation step outside the project**.
-
-## Dependencies are missing
-
-From the project directory:
-
-```bash
-uv sync
-```
-
-Do not install the Python packages globally.
 
 ## No sets are found
 
@@ -645,6 +450,7 @@ or:
 Printer paper-feed and duplex mechanisms differ, so a test page is strongly recommended.
 
 ---
+
 
 # License / source data
 
