@@ -1,0 +1,22 @@
+[project]
+name = "cockatrice-printer"
+version = "0.1.0"
+description = "Generate printable A4 card sheets from Cockatrice card database XML files."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pillow>=10.0",
+    "reportlab>=4.0",
+    "requests>=2.31",
+]
+
+[project.scripts]
+cockatrice-printer = "cockatrice_printer:main"
+cockprint = "cockatrice_printer:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["."]
