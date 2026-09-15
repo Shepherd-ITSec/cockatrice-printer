@@ -48,8 +48,7 @@ import time
 import xml.etree.ElementTree as ET
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable
-from urllib.parse import urlparse, unquote
+from tqdm import tqdm
 
 import requests
 from PIL import Image, ImageOps
@@ -70,7 +69,7 @@ COLS = 3
 ROWS = 3
 
 DEFAULT_GAP_MM = 2.0
-DEFAULT_MARGIN_MM = 5.0
+DEFAULT_MARGIN_MM = 0.0
 
 CARD_W = CARD_W_MM * MM
 CARD_H = CARD_H_MM * MM
@@ -263,11 +262,11 @@ def find_set(xml_dir: Path, set_code: str):
     )
 
     if len(matches) > 1:
-        print("Warning: set occurs in multiple XML files; using the one "
+        tqdm.write("Warning: set occurs in multiple XML files; using the one "
               "with the most cards:", file=sys.stderr)
         for path, info, all_cards in matches:
             count = sum(c.set_code == set_code for c in all_cards)
-            print(f"  {path.name}: {count} cards", file=sys.stderr)
+            tqdm.write(f"  {path.name}: {count} cards", file=sys.stderr)
 
     path, info, all_cards = matches[0]
     selected = [c for c in all_cards if c.set_code == set_code]
@@ -531,12 +530,10 @@ def draw_sheet(
     if registration:
         draw_registration_marks(c)
 
-    target_ratio = CARD_W / CARD_H
-
     temp_dir = images[0].parent / ".print_temp"
     temp_dir.mkdir(exist_ok=True)
 
-    for index, (card, image_path) in enumerate(zip(cards, images)):
+    for index, (card, image_path) in tqdm(enumerate(zip(cards, images)), desc="Drawing page", total=len(cards), leave=False):
         x, y = positions[index]
 
         if mirror or rotate180:
@@ -611,7 +608,7 @@ def build_pdf(
     c.setTitle("Cockatrice printable cards")
 
     # Front sheets.
-    for page_start in range(0, len(cards), per_page):
+    for page_start in tqdm(range(0, len(cards), per_page), desc="Printing sheets", total=len(cards) // per_page + 1):
         page_cards = cards[page_start:page_start + per_page]
         page_images = image_paths[page_start:page_start + per_page]
 
@@ -646,7 +643,7 @@ def build_pdf(
             make_default_back(back_path)
             back_images = [back_path] * len(cards)
 
-        for page_start in range(0, len(cards), per_page):
+        for page_start in tqdm(range(0, len(cards), per_page), desc="Back sheets", total=len(cards) // per_page + 1):
             page_cards = cards[page_start:page_start + per_page]
             page_images = back_images[page_start:page_start + per_page]
 
@@ -764,22 +761,22 @@ def cmd_list(args):
     files = discover_xml(xml_dir)
 
     if not files:
-        print(f"No XML/TXT files found in {xml_dir}")
+        tqdm.write(f"No XML/TXT files found in {xml_dir}")
         return 1
 
     for path in files:
         try:
             sets, cards = parse_cockatrice_xml(path)
         except Exception as exc:
-            print(f"\n{path.name}\n  ERROR: {exc}")
+            tqdm.write(f"\n{path.name}\n  ERROR: {exc}")
             continue
 
-        print(f"\n{path.name}")
-        print(f"  cards: {len(cards)}")
+        tqdm.write(f"\n{path.name}")
+        tqdm.write(f"  cards: {len(cards)}")
 
         for code, info in sorted(sets.items()):
             count = sum(c.set_code == code for c in cards)
-            print(
+            tqdm.write(
                 f"  {code:8} {count:4} cards  "
                 f"{info.longname}"
             )
@@ -796,27 +793,27 @@ def cmd_validate(args):
 
     if args.set:
         path, info, cards = find_set(xml_dir, args.set)
-        print(f"XML:  {path}")
-        print(f"Set:  {info.code} — {info.longname}")
-        print(f"Cards: {len(cards)}")
+        tqdm.write(f"XML:  {path}")
+        tqdm.write(f"Set:  {info.code} — {info.longname}")
+        tqdm.write(f"Cards: {len(cards)}")
 
         missing = [c for c in cards if not c.image_url]
         if missing:
-            print(f"Missing picURL: {len(missing)}")
+            tqdm.write(f"Missing picURL: {len(missing)}")
             for c in missing[:20]:
-                print(f"  #{c.number} {c.name}")
+                tqdm.write(f"  #{c.number} {c.name}")
             return 2
 
-        print("All selected cards have image URLs.")
+        tqdm.write("All selected cards have image URLs.")
         return 0
 
     # Validate every XML.
     all_data, errors = load_all_xml(xml_dir)
     for path, sets, cards in all_data:
-        print(f"OK  {path.name}: {len(cards)} card entries")
+        tqdm.write(f"OK  {path.name}: {len(cards)} card entries")
 
     for path, error in errors:
-        print(f"ERR {path.name}: {error}")
+        tqdm.write(f"ERR {path.name}: {error}")
 
     return 2 if errors else 0
 
@@ -835,14 +832,14 @@ def cmd_print(args):
     if not cards:
         raise SystemExit("No cards remain after filtering.")
 
-    print(f"Source XML : {path}")
-    print(f"Set        : {info.code} — {info.longname}")
-    print(f"Cards      : {len(cards)}")
-    print(f"Sheets     : {(len(cards) + 8) // 9}")
-    print(
+    tqdm.write(f"Source XML : {path}")
+    tqdm.write(f"Set        : {info.code} — {info.longname}")
+    tqdm.write(f"Cards      : {len(cards)}")
+    tqdm.write(f"Sheets     : {(len(cards) + 8) // 9}")
+    tqdm.write(
         f"Card size  : {CARD_W_MM:g} x {CARD_H_MM:g} mm"
     )
-    print(
+    tqdm.write(
         f"Cut style  : {args.cut_style}"
     )
 
@@ -865,23 +862,25 @@ def cmd_print(args):
 
     image_paths = []
 
-    print("\nChecking/downloading images...")
+    tqdm.write("\nChecking/downloading images...")
     failures = []
 
-    for i, card in enumerate(cards, 1):
+    pbar = tqdm(
+        enumerate(cards, 1),
+        desc="Downloading images",
+        total=len(cards),
+        leave=False,
+    )
+
+    for i, card in pbar:
+        pbar.set_postfix_str(f"#{card.number} {card.name}")
         try:
             image_paths.append(cache.get(card))
-            print(f"[{i:4}/{len(cards):4}] OK   #{card.number} {card.name}")
-        except Exception as exc:
-            failures.append((card, str(exc)))
-            print(
-                f"[{i:4}/{len(cards):4}] FAIL #{card.number} "
-                f"{card.name}: {exc}",
-                file=sys.stderr,
-            )
+        except Exception:
+            tqdm.write(f"#{card.number} {card.name} FAILED")
 
     if failures:
-        print(
+        tqdm.write(
             f"\nAborting: {len(failures)} card image(s) failed. "
             "No incomplete PDF was produced.",
             file=sys.stderr,
@@ -892,7 +891,7 @@ def cmd_print(args):
     if card_back and not card_back.exists():
         raise SystemExit(f"Card-back image not found: {card_back}")
 
-    print("\nWriting PDF...")
+    tqdm.write("\nWriting PDF...")
     build_pdf(
         cards,
         image_paths,
@@ -908,13 +907,13 @@ def cmd_print(args):
 
     write_manifest(cards, manifest, image_paths)
 
-    print("\nDone.")
-    print(f"PDF      : {output}")
-    print(f"Manifest : {manifest}")
-    print(f"Images   : {Path(args.image_dir).resolve()}")
+    tqdm.write("\nDone.")
+    tqdm.write(f"PDF      : {output}")
+    tqdm.write(f"Manifest : {manifest}")
+    tqdm.write(f"Images   : {Path(args.image_dir).resolve()}")
 
     if args.duplex:
-        print(
+        tqdm.write(
             "\nDuplex note: print a small 9-card test first. "
             "Different printers flip the rear sheet differently. "
             "Try --back rotate180 or --back mirror if the backs are "
@@ -1056,16 +1055,17 @@ def build_parser():
 
 
 def main():
+    print("--- Cockatrice Printer ---")
     parser = build_parser()
     args = parser.parse_args()
 
     try:
         return args.func(args)
     except KeyboardInterrupt:
-        print("\nInterrupted.", file=sys.stderr)
+        tqdm.write("\nInterrupted.", file=sys.stderr)
         return 130
     except Exception as exc:
-        print(f"ERROR: {exc}", file=sys.stderr)
+        tqdm.write(f"ERROR: {exc}", file=sys.stderr)
         return 1
 
 
