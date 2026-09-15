@@ -68,7 +68,7 @@ CARD_H_MM = 88.0
 COLS = 3
 ROWS = 3
 
-DEFAULT_GAP_MM = 2.0
+DEFAULT_GAP_MM = 0.0
 DEFAULT_MARGIN_MM = 0.0
 
 CARD_W = CARD_W_MM * MM
@@ -447,19 +447,35 @@ def draw_crop_marks(
 
     c.restoreState()
 
-
-def draw_full_cut_lines(
+def draw_page_cut_lines(
     c: canvas.Canvas,
-    x: float,
-    y: float,
-    w: float,
-    h: float,
+    positions: list[tuple[float, float]],
     line_width: float = 0.25,
 ):
-    """Draw a complete thin rectangle for easy trimming."""
+    """Draw continuous cut lines across the entire A4 page."""
     c.saveState()
     c.setLineWidth(line_width)
-    c.rect(x, y, w, h, stroke=1, fill=0)
+
+    # Get every X boundary from the actual card positions.
+    x_lines = sorted(set(
+        [x for x, _ in positions] +
+        [x + CARD_W for x, _ in positions]
+    ))
+
+    # Get every Y boundary from the actual card positions.
+    y_lines = sorted(set(
+        [y for _, y in positions] +
+        [y + CARD_H for _, y in positions]
+    ))
+
+    # Vertical cuts: extend from the bottom to the top of A4.
+    for x in x_lines:
+        c.line(x, 0, x, A4_H)
+
+    # Horizontal cuts: extend from the left to the right of A4.
+    for y in y_lines:
+        c.line(0, y, A4_W, y)
+
     c.restoreState()
 
 
@@ -486,6 +502,57 @@ def draw_registration_marks(c: canvas.Canvas):
 
     c.restoreState()
 
+def draw_card_image(
+    c: canvas.Canvas,
+    image_path: Path,
+    x: float,
+    y: float,
+    card: Card,
+):
+    """
+    Draw a card image into the normal 63 x 88 mm card slot.
+
+    Fuse/split-style cards are rotated 90 degrees so the two halves
+    are oriented correctly when printed on a normal card.
+    """
+    rotate_image = card.layout.lower() in {
+        "split",
+        "aftermath",
+        "flip",
+        "fuse",
+    }
+
+    if rotate_image:
+        c.saveState()
+
+        # Rotate the image 90 degrees around the center of the card.
+        c.translate(x + CARD_W / 2, y + CARD_H / 2)
+        c.rotate(90)
+
+        # After rotation, swap width/height.
+        c.drawImage(
+            str(image_path),
+            -CARD_H / 2,
+            -CARD_W / 2,
+            width=CARD_H,
+            height=CARD_W,
+            preserveAspectRatio=False,
+            mask="auto",
+        )
+
+        c.restoreState()
+    else:
+        c.drawImage(
+            str(image_path),
+            x,
+            y,
+            width=CARD_W,
+            height=CARD_H,
+            preserveAspectRatio=False,
+            mask="auto",
+        )
+
+
 
 def page_positions(gap_mm: float, margin_mm: float):
     gap = mm(gap_mm)
@@ -495,18 +562,33 @@ def page_positions(gap_mm: float, margin_mm: float):
     grid_h = ROWS * CARD_H + (ROWS - 1) * gap
 
     if grid_w + 2 * margin > A4_W + 0.01:
-        raise ValueError("3 x 63 mm cards plus gaps/margins do not fit A4 width")
-    if grid_h + 2 * margin > A4_H + 0.01:
-        raise ValueError("3 x 88 mm cards plus gaps/margins do not fit A4 height")
+        raise ValueError(
+            "3 x 63 mm cards plus gaps/margins do not fit A4 width"
+        )
 
-    start_x = (A4_W - grid_w) / 2
-    start_y = (A4_H - grid_h) / 2
+    if grid_h + 2 * margin > A4_H + 0.01:
+        raise ValueError(
+            "3 x 88 mm cards plus gaps/margins do not fit A4 height"
+        )
+
+    # Center the card grid in the printable page area defined by margin.
+    available_w = A4_W - 2 * margin
+    available_h = A4_H - 2 * margin
+
+    start_x = margin + (available_w - grid_w) / 2
+    start_y = margin + (available_h - grid_h) / 2
 
     positions = []
+
     for row in range(ROWS):
         for col in range(COLS):
             x = start_x + col * (CARD_W + gap)
-            y = A4_H - start_y - CARD_H - row * (CARD_H + gap)
+            y = (
+                A4_H
+                - start_y
+                - CARD_H
+                - row * (CARD_H + gap)
+            )
             positions.append((x, y))
 
     return positions
@@ -533,7 +615,7 @@ def draw_sheet(
     temp_dir = images[0].parent / ".print_temp"
     temp_dir.mkdir(exist_ok=True)
 
-    for index, (card, image_path) in tqdm(enumerate(zip(cards, images)), desc="Drawing page", total=len(cards), leave=False):
+    for index, (card, image_path) in tqdm(enumerate(zip(cards, images)), desc="Drawing cards", total=len(cards), leave=False, unit="card"):
         x, y = positions[index]
 
         if mirror or rotate180:
@@ -565,20 +647,24 @@ def draw_sheet(
             )
             c.restoreState()
         else:
-            c.drawImage(
-                str(image_path),
+            draw_card_image(
+                c,
+                image_path,
                 x,
                 y,
-                width=CARD_W,
-                height=CARD_H,
-                preserveAspectRatio=False,
-                mask="auto",
+                card,
             )
+
 
         if cut_style == "corners":
             draw_crop_marks(c, x, y, CARD_W, CARD_H)
-        elif cut_style == "lines":
-            draw_full_cut_lines(c, x, y, CARD_W, CARD_H)
+    if cut_style == "lines":
+        draw_page_cut_lines(
+            c,
+            positions,
+            line_width=0.25,
+        )
+
 
     if label:
         c.saveState()
@@ -608,7 +694,7 @@ def build_pdf(
     c.setTitle("Cockatrice printable cards")
 
     # Front sheets.
-    for page_start in tqdm(range(0, len(cards), per_page), desc="Printing sheets", total=len(cards) // per_page + 1):
+    for page_start in tqdm(range(0, len(cards), per_page), desc="Drawing pages", total=len(cards) // per_page + 1, unit="page"):
         page_cards = cards[page_start:page_start + per_page]
         page_images = image_paths[page_start:page_start + per_page]
 
@@ -643,7 +729,7 @@ def build_pdf(
             make_default_back(back_path)
             back_images = [back_path] * len(cards)
 
-        for page_start in tqdm(range(0, len(cards), per_page), desc="Back sheets", total=len(cards) // per_page + 1):
+        for page_start in tqdm(range(0, len(cards), per_page), desc="Back sheets", total=len(cards) // per_page + 1, unit="sheet"):
             page_cards = cards[page_start:page_start + per_page]
             page_images = back_images[page_start:page_start + per_page]
 
@@ -667,7 +753,7 @@ def build_pdf(
                     f"({duplex_back})"
                 ),
             )
-
+    tqdm.write("Saving...")
     c.save()
 
 
@@ -840,8 +926,15 @@ def cmd_print(args):
         f"Card size  : {CARD_W_MM:g} x {CARD_H_MM:g} mm"
     )
     tqdm.write(
+        f"Margins    : {args.margin} mm"
+    )
+    tqdm.write(
+        f"Gap        : {args.gap} mm"
+    )
+    tqdm.write(
         f"Cut style  : {args.cut_style}"
     )
+
 
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -869,15 +962,21 @@ def cmd_print(args):
         enumerate(cards, 1),
         desc="Downloading images",
         total=len(cards),
-        leave=False,
+        leave=True,
     )
 
     for i, card in pbar:
-        pbar.set_postfix_str(f"#{card.number} {card.name}")
+        char_len = 25
+        cardname = card.name[:char_len].ljust(char_len)
         try:
+            pbar.set_postfix_str(
+                f"{cardname}",
+                refresh=False,
+            )
             image_paths.append(cache.get(card))
         except Exception:
             tqdm.write(f"#{card.number} {card.name} FAILED")
+
 
     if failures:
         tqdm.write(
@@ -1007,8 +1106,8 @@ def build_parser():
     p.add_argument(
         "--cut-style",
         choices=["none", "corners", "lines"],
-        default="corners",
-        help="Cutting guides (default: corners)",
+        default="none",
+        help="Cutting guides (default: none)",
     )
 
     p.add_argument(
